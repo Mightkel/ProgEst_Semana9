@@ -34,9 +34,11 @@ MAX_TEXT_LENGTH = 100
 
 
 @app.before_request
-def initialize_queue():
+def initialize_structures():
     session.setdefault("queue", [])
-    session.setdefault("capacity", DEFAULT_CAPACITY)
+    session.setdefault("stack", [])
+    session.setdefault("queue_capacity", DEFAULT_CAPACITY)
+    session.setdefault("stack_capacity", DEFAULT_CAPACITY)
 
 
 def save_photo(photo_data):
@@ -45,11 +47,9 @@ def save_photo(photo_data):
     if not photo_data.startswith(prefix):
         raise ValueError("Formato de fotografía no válido.")
 
-    encoded_image = photo_data[len(prefix):]
-
     try:
         image_bytes = base64.b64decode(
-            encoded_image,
+            photo_data[len(prefix):],
             validate=True
         )
     except (ValueError, binascii.Error) as error:
@@ -68,8 +68,7 @@ def save_photo(photo_data):
         )
 
     filename = f"{uuid.uuid4().hex}.jpg"
-    filepath = UPLOAD_FOLDER / filename
-    filepath.write_bytes(image_bytes)
+    (UPLOAD_FOLDER / filename).write_bytes(image_bytes)
 
     return filename
 
@@ -77,11 +76,25 @@ def save_photo(photo_data):
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        action = request.form.get("action", "")
-        queue = session["queue"]
-        capacity = session["capacity"]
+        mode = request.form.get("mode", "queue")
+    else:
+        mode = request.args.get("mode", "queue")
 
-        # Cambiar la capacidad de la cola
+    if mode not in ("queue", "stack"):
+        mode = "queue"
+
+    items_key = "queue" if mode == "queue" else "stack"
+    capacity_key = (
+        "queue_capacity" if mode == "queue"
+        else "stack_capacity"
+    )
+
+    if request.method == "POST":
+        action = request.form.get("action", "")
+        items = session[items_key]
+        capacity = session[capacity_key]
+
+        # Configurar capacidad
         if action == "set_capacity":
             try:
                 new_capacity = int(
@@ -91,18 +104,15 @@ def index():
                 if not 1 <= new_capacity <= MAX_CAPACITY:
                     raise ValueError
 
-                if new_capacity < len(queue):
+                if new_capacity < len(items):
                     flash(
                         "La capacidad no puede ser menor "
                         "que la cantidad actual de elementos.",
                         "warning"
                     )
                 else:
-                    session["capacity"] = new_capacity
-                    flash(
-                        "Capacidad actualizada.",
-                        "success"
-                    )
+                    session[capacity_key] = new_capacity
+                    flash("Capacidad actualizada.", "success")
 
             except ValueError:
                 flash(
@@ -110,122 +120,114 @@ def index():
                     "danger"
                 )
 
-        # Agregar texto al final de la cola
-        elif action == "enqueue":
+        # Agregar texto
+        elif action == "add_text":
             item = request.form.get("item", "").strip()
 
             if not item:
-                flash(
-                    "Escribe un elemento antes de agregarlo.",
-                    "warning"
-                )
-
+                flash("Escribe un elemento.", "warning")
             elif len(item) > MAX_TEXT_LENGTH:
                 flash(
                     "El texto no puede superar 100 caracteres.",
                     "warning"
                 )
-
-            elif len(queue) >= capacity:
-                flash("La cola está llena.", "warning")
-
+            elif len(items) >= capacity:
+                flash(
+                    "La estructura está llena.",
+                    "warning"
+                )
             else:
-                queue.append({
+                items.append({
                     "type": "text",
                     "value": item
                 })
+                session[items_key] = items
 
-                session["queue"] = queue
-                flash(
-                    "Elemento agregado al final de la cola.",
-                    "success"
-                )
+                if mode == "queue":
+                    flash("Elemento agregado al final de la cola.", "success")
+                else:
+                    flash("Elemento agregado a la cima de la pila.", "success")
 
-        # Agregar una fotografía al final de la cola
-        elif action == "enqueue_photo":
+        # Agregar fotografía
+        elif action == "add_photo":
             photo_data = request.form.get("photo_data", "")
 
-            if len(queue) >= capacity:
-                flash("La cola está llena.", "warning")
-
+            if len(items) >= capacity:
+                flash("La estructura está llena.", "warning")
             elif not photo_data:
                 flash(
                     "Primero debes tomar una fotografía.",
                     "warning"
                 )
-
             else:
                 try:
                     filename = save_photo(photo_data)
 
-                    queue.append({
+                    items.append({
                         "type": "image",
                         "value": filename
                     })
+                    session[items_key] = items
 
-                    session["queue"] = queue
-                    flash(
-                        "Fotografía agregada a la cola.",
-                        "success"
-                    )
+                    flash("Fotografía agregada correctamente.", "success")
 
                 except ValueError as error:
                     flash(str(error), "danger")
 
-        # Consultar el primer elemento
+        # Consultar el próximo elemento
         elif action == "peek":
-            if queue:
-                first_item = queue[0]
+            if items:
+                next_item = items[0] if mode == "queue" else items[-1]
 
-                if first_item["type"] == "image":
-                    flash(
-                        "El primer elemento de la cola es una fotografía.",
-                        "info"
-                    )
+                if next_item["type"] == "image":
+                    description = "una fotografía"
                 else:
-                    flash(
-                        f"Primer elemento: {first_item['value']}",
-                        "info"
-                    )
-            else:
-                flash("La cola está vacía.", "warning")
+                    description = next_item["value"]
 
-        # Retirar el primer elemento (FIFO)
-        elif action == "dequeue":
-            if queue:
-                removed = queue.pop(0)
-                session["queue"] = queue
-
-                if removed["type"] == "image":
-                    flash(
-                        "Fotografía retirada de la cola.",
-                        "success"
-                    )
-                else:
-                    flash(
-                        f"Elemento retirado: {removed['value']}",
-                        "success"
-                    )
-            else:
-                flash(
-                    "No puedes retirar elementos de una cola vacía.",
-                    "warning"
+                label = (
+                    "Primer elemento de la cola"
+                    if mode == "queue"
+                    else "Elemento en la cima de la pila"
                 )
 
-        # Vaciar la cola
+                flash(f"{label}: {description}", "info")
+            else:
+                flash("La estructura está vacía.", "warning")
+
+        # Retirar elemento según el tipo de estructura
+        elif action == "remove":
+            if items:
+                if mode == "queue":
+                    removed = items.pop(0)
+                else:
+                    removed = items.pop()
+
+                session[items_key] = items
+
+                if removed["type"] == "image":
+                    description = "fotografía"
+                else:
+                    description = removed["value"]
+
+                flash(f"Elemento retirado: {description}", "success")
+            else:
+                flash("La estructura está vacía.", "warning")
+
+        # Vaciar únicamente la estructura activa
         elif action == "clear":
-            session["queue"] = []
-            flash("La cola se ha vaciado.", "success")
+            session[items_key] = []
+            flash("La estructura se ha vaciado.", "success")
 
         else:
             flash("Operación no válida.", "danger")
 
-        return redirect(url_for("index"))
+        return redirect(url_for("index", mode=mode))
 
     return render_template(
         "index.html",
-        queue=session["queue"],
-        capacity=session["capacity"]
+        mode=mode,
+        items=session[items_key],
+        capacity=session[capacity_key]
     )
 
 
