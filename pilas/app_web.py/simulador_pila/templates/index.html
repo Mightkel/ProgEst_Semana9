@@ -1,0 +1,806 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>StackFlow | Simulador de Cola</title>
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+
+    <style>
+        :root {
+            --background: #080f1d;
+            --panel: #0e1a2d;
+            --panel-light: #14243b;
+            --border: #233752;
+            --primary: #3b82f6;
+            --text: #e5edf8;
+            --muted: #91a4bf;
+        }
+
+        body {
+            background: var(--background);
+            color: var(--text);
+            font-family: "Segoe UI", sans-serif;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: #0c1628;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .brand {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: white;
+        }
+
+        .brand span {
+            color: #60a5fa;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 22px;
+            height: 100%;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .stat {
+            background: var(--panel-light);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .stat-number {
+            font-size: 1.8rem;
+            font-weight: 800;
+        }
+
+        .form-control,
+        .form-select {
+            background: #091426;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            background: #091426;
+            color: white;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 0.2rem #3b82f633;
+        }
+
+        .form-control::placeholder {
+            color: #7386a1;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .btn-outline-light {
+            border-color: var(--border);
+            color: var(--text);
+        }
+
+        .btn-outline-light:hover {
+            background: var(--panel-light);
+            color: white;
+        }
+
+        .queue-area {
+            background: #091426;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            min-height: 230px;
+            overflow-x: auto;
+        }
+
+        .queue-track {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: max-content;
+            min-height: 155px;
+            padding: 10px;
+        }
+
+        .queue-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 135px;
+            min-height: 125px;
+            padding: 12px;
+            border: 1px solid #315b91;
+            border-radius: 12px;
+            background: linear-gradient(
+                145deg,
+                #18375a,
+                #10243e
+            );
+            box-shadow: 0 6px 18px #00000020;
+            overflow-wrap: anywhere;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .queue-item:hover {
+            transform: translateY(-4px);
+            border-color: #60a5fa;
+        }
+
+        .queue-item.first {
+            border: 2px solid #34d399;
+            box-shadow: 0 0 14px #34d39920;
+        }
+
+        .queue-item img {
+            width: 90px;
+            height: 75px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .item-number {
+            font-size: 0.72rem;
+            color: #a8c9f8;
+            margin-bottom: 7px;
+        }
+
+        .item-value {
+            font-weight: 600;
+            text-align: center;
+            max-width: 100%;
+            overflow-wrap: anywhere;
+        }
+
+        .queue-arrow {
+            color: #60a5fa;
+            font-size: 1.4rem;
+            font-weight: bold;
+        }
+
+        .queue-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 180px;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        .queue-empty .icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        video,
+        #photoPreview {
+            width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+            border-radius: 12px;
+            background: #050a12;
+        }
+
+        .camera-box {
+            background: #091426;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .section-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .operation-btn {
+            min-height: 48px;
+        }
+
+        footer {
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-dark py-3">
+        <div class="container">
+            <a class="navbar-brand brand" href="/">
+                Queue<span>Flow</span>
+            </a>
+
+            <span class="badge text-bg-primary">
+                Simulador FIFO
+            </span>
+        </div>
+    </nav>
+
+    <main class="container py-4 py-lg-5">
+
+        <div class="mb-4">
+            <h1 class="fw-bold">Simulador de cola</h1>
+            <p class="muted mb-0">
+                Administra elementos siguiendo el principio
+                FIFO: primero en entrar, primero en salir.
+            </p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div
+                        class="alert alert-{{ category }} alert-dismissible fade show"
+                        role="alert"
+                    >
+                        {{ message }}
+
+                        <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="alert"
+                            aria-label="Cerrar"
+                        ></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-md-4">
+                <div class="stat">
+                    <div class="muted">Elementos actuales</div>
+                    <div class="stat-number">
+                        {{ queue|length }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-md-4">
+                <div class="stat">
+                    <div class="muted">Capacidad</div>
+                    <div class="stat-number">
+                        {{ capacity }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-md-4">
+                <div class="stat">
+                    <div class="muted">Espacios disponibles</div>
+                    <div class="stat-number">
+                        {{ capacity - queue|length }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+
+            <!-- Visualización de la cola -->
+            <div class="col-12">
+                <section class="panel">
+                    <div class="d-flex flex-wrap justify-content-between
+                                align-items-center gap-2 mb-3">
+                        <div>
+                            <h2 class="section-title mb-1">
+                                Cola de elementos
+                            </h2>
+                            <p class="muted small mb-0">
+                                El primer elemento se retira primero.
+                            </p>
+                        </div>
+
+                        <span class="badge text-bg-success">
+                            FIFO activo
+                        </span>
+                    </div>
+
+                    <div class="queue-area">
+
+                        {% if queue %}
+                            <div class="d-flex justify-content-between
+                                        small muted mb-2">
+                                <span>← Salida</span>
+                                <span>Entrada →</span>
+                            </div>
+
+                            <div class="queue-track">
+                                {% for item in queue %}
+                                    <div class="queue-item
+                                        {% if loop.first %}first{% endif %}">
+
+                                        <div class="item-number">
+                                            {% if loop.first %}
+                                                PRÓXIMO A SALIR
+                                            {% else %}
+                                                ELEMENTO {{ loop.index }}
+                                            {% endif %}
+                                        </div>
+
+                                        {% if item.type == "image" %}
+                                            <img
+                                                src="{{ url_for('static', filename='uploads/' ~ item.value) }}"
+                                                alt="Fotografía en la cola"
+                                            >
+                                            <div class="item-value">
+                                                Fotografía
+                                            </div>
+                                        {% else %}
+                                            <div class="item-value">
+                                                {{ item.value }}
+                                            </div>
+                                        {% endif %}
+
+                                    </div>
+
+                                    {% if not loop.last %}
+                                        <div class="queue-arrow">→</div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="queue-empty">
+                                <div class="icon">⇢</div>
+                                <h5>La cola está vacía</h5>
+                                <p class="mb-0">
+                                    Agrega un texto o toma una fotografía
+                                    para comenzar.
+                                </p>
+                            </div>
+                        {% endif %}
+
+                    </div>
+                </section>
+            </div>
+
+            <!-- Configuración y texto -->
+            <div class="col-12 col-lg-6">
+                <section class="panel">
+                    <h2 class="section-title">
+                        Agregar elementos
+                    </h2>
+                    <p class="muted small mb-4">
+                        Los nuevos elementos se colocan al final.
+                    </p>
+
+                    <form method="POST" class="mb-4">
+                        <input
+                            type="hidden"
+                            name="action"
+                            value="enqueue"
+                        >
+
+                        <label for="item" class="form-label">
+                            Texto del elemento
+                        </label>
+
+                        <div class="input-group">
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="item"
+                                name="item"
+                                maxlength="100"
+                                placeholder="Ej. Caja A"
+                                required
+                            >
+
+                            <button
+                                class="btn btn-primary"
+                                type="submit"
+                                {% if queue|length >= capacity %}disabled{% endif %}
+                            >
+                                Agregar
+                            </button>
+                        </div>
+
+                        <div class="form-text muted">
+                            Máximo 100 caracteres.
+                        </div>
+                    </form>
+
+                    <hr style="border-color: var(--border);">
+
+                    <h3 class="section-title mt-4">
+                        Capacidad máxima
+                    </h3>
+
+                    <form method="POST">
+                        <input
+                            type="hidden"
+                            name="action"
+                            value="set_capacity"
+                        >
+
+                        <label for="capacity" class="form-label">
+                            Número de elementos permitidos
+                        </label>
+
+                        <div class="input-group">
+                            <input
+                                type="number"
+                                class="form-control"
+                                id="capacity"
+                                name="capacity"
+                                min="1"
+                                max="100"
+                                value="{{ capacity }}"
+                                required
+                            >
+
+                            <button
+                                class="btn btn-outline-light"
+                                type="submit"
+                            >
+                                Actualizar
+                            </button>
+                        </div>
+
+                        <div class="form-text muted">
+                            Puedes configurar entre 1 y 100 elementos.
+                        </div>
+                    </form>
+                </section>
+            </div>
+
+            <!-- Cámara -->
+            <div class="col-12 col-lg-6">
+                <section class="panel">
+                    <h2 class="section-title">
+                        Agregar fotografía
+                    </h2>
+
+                    <p class="muted small mb-3">
+                        Toma una foto y agrégala al final de la cola.
+                    </p>
+
+                    <div class="camera-box">
+                        <div id="cameraPanel" class="d-none">
+                            <video
+                                id="camera"
+                                autoplay
+                                playsinline
+                            ></video>
+
+                            <div class="d-flex gap-2 mt-3">
+                                <button
+                                    type="button"
+                                    class="btn btn-primary flex-fill"
+                                    id="takePhoto"
+                                >
+                                    Tomar foto
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-light"
+                                    id="closeCamera"
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="cameraStart">
+                            <div class="text-center py-4">
+                                <div style="font-size: 2.5rem;">📷</div>
+                                <p class="muted mb-3">
+                                    Activa tu cámara para tomar una foto.
+                                </p>
+
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-light"
+                                    id="startCamera"
+                                >
+                                    Activar cámara
+                                </button>
+                            </div>
+                        </div>
+
+                        <canvas id="photoCanvas" class="d-none"></canvas>
+
+                        <div id="previewPanel" class="d-none mt-3">
+                            <img
+                                id="photoPreview"
+                                alt="Vista previa de la fotografía"
+                            >
+
+                            <form method="POST" id="photoForm">
+                                <input
+                                    type="hidden"
+                                    name="action"
+                                    value="enqueue_photo"
+                                >
+
+                                <input
+                                    type="hidden"
+                                    name="photo_data"
+                                    id="photoData"
+                                >
+
+                                <div class="d-flex gap-2 mt-3">
+                                    <button
+                                        type="submit"
+                                        class="btn btn-primary flex-fill"
+                                        {% if queue|length >= capacity %}disabled{% endif %}
+                                    >
+                                        Agregar a la cola
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        class="btn btn-outline-light"
+                                        id="retakePhoto"
+                                    >
+                                        Repetir
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="form-text muted mt-2">
+                        La cámara requiere permiso del navegador.
+                    </div>
+                </section>
+            </div>
+
+            <!-- Operaciones FIFO -->
+            <div class="col-12">
+                <section class="panel">
+                    <h2 class="section-title">
+                        Operaciones de la cola
+                    </h2>
+
+                    <p class="muted small mb-4">
+                        Consulta el primer elemento, retíralo o
+                        vacía toda la cola.
+                    </p>
+
+                    <div class="row g-2">
+                        <div class="col-12 col-md-4">
+                            <form method="POST">
+                                <input
+                                    type="hidden"
+                                    name="action"
+                                    value="peek"
+                                >
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-outline-info w-100 operation-btn"
+                                >
+                                    Consultar primero
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <form
+                                method="POST"
+                                id="dequeueForm"
+                            >
+                                <input
+                                    type="hidden"
+                                    name="action"
+                                    value="dequeue"
+                                >
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-primary w-100 operation-btn"
+                                    {% if not queue %}disabled{% endif %}
+                                >
+                                    Retirar primero
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <form
+                                method="POST"
+                                id="clearForm"
+                            >
+                                <input
+                                    type="hidden"
+                                    name="action"
+                                    value="clear"
+                                >
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-outline-danger w-100 operation-btn"
+                                    {% if not queue %}disabled{% endif %}
+                                >
+                                    Vaciar cola
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <footer class="text-center mt-5">
+            QueueFlow · Simulador de estructuras de datos FIFO
+        </footer>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const camera = document.getElementById("camera");
+        const cameraPanel = document.getElementById("cameraPanel");
+        const cameraStart = document.getElementById("cameraStart");
+        const photoCanvas = document.getElementById("photoCanvas");
+        const photoPreview = document.getElementById("photoPreview");
+        const previewPanel = document.getElementById("previewPanel");
+        const photoData = document.getElementById("photoData");
+
+        let cameraStream = null;
+
+        async function startCamera() {
+            if (!navigator.mediaDevices ||
+                !navigator.mediaDevices.getUserMedia) {
+                alert(
+                    "Tu navegador no permite acceder a la cámara. " +
+                    "Usa localhost o una conexión HTTPS."
+                );
+                return;
+            }
+
+            try {
+                cameraStream =
+                    await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: "environment"
+                        },
+                        audio: false
+                    });
+
+                camera.srcObject = cameraStream;
+                cameraPanel.classList.remove("d-none");
+                cameraStart.classList.add("d-none");
+                previewPanel.classList.add("d-none");
+
+            } catch (error) {
+                alert(
+                    "No se pudo activar la cámara. " +
+                    "Revisa los permisos del navegador."
+                );
+            }
+        }
+
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => {
+                    track.stop();
+                });
+
+                cameraStream = null;
+            }
+
+            camera.srcObject = null;
+            cameraPanel.classList.add("d-none");
+            cameraStart.classList.remove("d-none");
+        }
+
+        function takePhoto() {
+            if (!camera.videoWidth || !camera.videoHeight) {
+                alert("Espera un momento hasta que cargue la cámara.");
+                return;
+            }
+
+            photoCanvas.width = camera.videoWidth;
+            photoCanvas.height = camera.videoHeight;
+
+            const context = photoCanvas.getContext("2d");
+            context.drawImage(
+                camera,
+                0,
+                0,
+                photoCanvas.width,
+                photoCanvas.height
+            );
+
+            photoCanvas.toBlob(blob => {
+                if (!blob) {
+                    alert("No se pudo tomar la fotografía.");
+                    return;
+                }
+
+                const reader = new FileReader();
+
+                reader.onloadend = () => {
+                    photoData.value = reader.result;
+                    photoPreview.src = reader.result;
+
+                    previewPanel.classList.remove("d-none");
+                    stopCamera();
+                };
+
+                reader.readAsDataURL(blob);
+            }, "image/jpeg", 0.75);
+        }
+
+        function resetPhoto() {
+            photoData.value = "";
+            photoPreview.src = "";
+            previewPanel.classList.add("d-none");
+            startCamera();
+        }
+
+        document
+            .getElementById("startCamera")
+            .addEventListener("click", startCamera);
+
+        document
+            .getElementById("takePhoto")
+            .addEventListener("click", takePhoto);
+
+        document
+            .getElementById("closeCamera")
+            .addEventListener("click", stopCamera);
+
+        document
+            .getElementById("retakePhoto")
+            .addEventListener("click", resetPhoto);
+
+        document
+            .getElementById("photoForm")
+            .addEventListener("submit", event => {
+                if (!photoData.value) {
+                    event.preventDefault();
+                    alert("Primero debes tomar una fotografía.");
+                }
+            });
+
+        document
+            .getElementById("dequeueForm")
+            .addEventListener("submit", event => {
+                if (!confirm(
+                    "¿Deseas retirar el primer elemento de la cola?"
+                )) {
+                    event.preventDefault();
+                }
+            });
+
+        document
+            .getElementById("clearForm")
+            .addEventListener("submit", event => {
+                if (!confirm(
+                    "¿Seguro que deseas vaciar toda la cola?"
+                )) {
+                    event.preventDefault();
+                }
+            });
+
+        window.addEventListener("pagehide", stopCamera);
+    </script>
+</body>
+</html>
